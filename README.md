@@ -1,9 +1,20 @@
 # Real-Time AI Posture Correction for Powerlifting Exercises Using YOLOv5 and MediaPipe
 ![rea](https://github.com/PSLeon24/AI_Exercise_Pose_Feedback/assets/59058869/7a8d6fc1-2d21-45a9-b92f-fdd8cadc43b9)
 
-- Paper: <a href="https://ieeexplore.ieee.org/abstract/document/10798440">Paper Download</a>
-- PPT: <a href="https://github.com/PSLeon24/AI_Exercise_Pose_Feedback/blob/main/docs/final_presentation.pdf">PPT Download</a>
 - Demo Video: https://youtu.be/u4f_sdjk1Ig
+
+Details of algorithms and experimental results can be found in our following paper:
+```
+@inproceedings{10798440,
+  title={Real-Time AI Posture Correction for Powerlifting Exercises Using YOLOv5 and MediaPipe},
+  author={Ko, Yeong-Min and Nasridinov, Aziz and Park, So-Hyun},
+  journal={IEEE Access},
+  year={2024}
+}
+```
+
+Paper: <a href="https://ieeexplore.ieee.org/abstract/document/10798440">Paper Download</a><br>
+<b>Please CITE</b> our paper whenever this repository is used to help produce published results or incorporated into other software.
 
 ### Description
 A Study on the big three exercises AI posture correction service Using YOLOv5 and MediaPipe<br>
