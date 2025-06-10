@@ -3,8 +3,9 @@
 
 - Demo Video: https://youtu.be/u4f_sdjk1Ig
 
+## Citation
 Details of algorithms and experimental results can be found in our following paper:
-```
+```bibtex
 @inproceedings{10798440,
   title={Real-Time AI Posture Correction for Powerlifting Exercises Using YOLOv5 and MediaPipe},
   author={Ko, Yeong-Min and Nasridinov, Aziz and Park, So-Hyun},
