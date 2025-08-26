@@ -6,11 +6,12 @@
 ## Citation
 Details of algorithms and experimental results can be found in our following paper:
 ```bibtex
-@inproceedings{10798440,
-  title={Real-Time AI Posture Correction for Powerlifting Exercises Using YOLOv5 and MediaPipe},
-  author={Ko, Yeong-Min and Nasridinov, Aziz and Park, So-Hyun},
-  journal={IEEE Access},
-  year={2024}
+@article{ko2024real,
+  author = {Ko, Yeong-Min and Nasridinov, Aziz and Park, So-Hyun},
+  title = {Real-time AI posture correction for powerlifting exercises using YOLOv5 and MediaPipe},
+  journal = {IEEE Access},
+  year = {2024},
+  volume = {4}
 }
 ```
 
