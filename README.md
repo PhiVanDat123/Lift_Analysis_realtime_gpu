@@ -20,7 +20,7 @@ Paper: <a href="https://ieeexplore.ieee.org/abstract/document/10798440">Paper Do
 
 ### Description
 A Study on the big three exercises AI posture correction service Using YOLOv5 and MediaPipe<br>
-study duration: 2023.09.01 ~ 2023.11.20 <br>
+Research Duration: 2023.09.01 ~ 2023.11.20 <br>
 |<b>Yeong-Min Ko</b>|
 |:--:|
 |<img height="180" src="https://github.com/PSLeon24/AI_Exercise_Pose_Feedback/assets/59058869/6b04d3f5-e87a-4a2b-a2a9-e406e575b6fd">|
@@ -65,7 +65,7 @@ study duration: 2023.09.01 ~ 2023.11.20 <br>
   - Deadlift: <a href="https://github.com/PSLeon24/AI_Exercise_Pose_Feedback/tree/main/labeling/deadlift">read more</a>
     - ![스크린샷 2023-10-08 203430](https://github.com/PSLeon24/AI_Exercise_Pose_Feedback/assets/59058869/ef3795db-e999-477c-824b-58ab4845ab55)
 
-## Train & Evaluate
+## Training & Evaluation
 ### YOLOv5
   - Detect only a Person exercising something
     - Hyperparameters to train
