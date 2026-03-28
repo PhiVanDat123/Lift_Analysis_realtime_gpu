@@ -2,3 +2,10 @@
 */.ipynb_checkpoints/*
 .DS_Store
 */.DS_Store
+
+# Secrets
+.env
+
+# YOLO model weights (large binary files)
+models/*.pt
+models/*.onnx
