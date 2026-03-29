@@ -605,7 +605,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         return
 
     fps              = cap.get(cv2.CAP_PROP_FPS) or 30
-    INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 320
+    INFER_MAX_DIM    = 480 if _GPU_AVAILABLE else 320
     OVERLAY_DURATION = int(fps * 3)
 
     vid_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
