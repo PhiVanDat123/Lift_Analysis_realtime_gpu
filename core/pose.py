@@ -5,10 +5,14 @@ mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
+import torch as _torch
+_complexity = 2 if _torch.cuda.is_available() else 0
+print(f"[pose] MediaPipe complexity={_complexity} ({'GPU available' if _torch.cuda.is_available() else 'CPU only'})")
+
 pose_detector = mp_pose.Pose(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5,
-    model_complexity=0,
+    model_complexity=_complexity,
 )
 
 

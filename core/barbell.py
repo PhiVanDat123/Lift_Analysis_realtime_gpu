@@ -35,8 +35,12 @@ def _load_rf_model():
 def _load_yolo_model():
     global _yolo_model
     if _yolo_model is None:
-        from ultralytics import YOLO  
+        import torch
+        from ultralytics import YOLO
         _yolo_model = YOLO(str(MODEL_PATH))
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _yolo_model.to(device)
+        print(f"[barbell] YOLO running on {device.upper()}")
     return _yolo_model
 
 
@@ -102,7 +106,7 @@ class BarbellTracker:
     def _detect_local(self, frame_rgb, h, w):
         try:
             model   = _load_yolo_model()
-            results = model(frame_rgb, verbose=False)[0]
+            results = model(frame_rgb, verbose=False, half=True)[0]
 
             best, best_conf = None, 0.0
             for box in results.boxes:

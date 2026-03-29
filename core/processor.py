@@ -21,6 +21,9 @@ import numpy as np
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
+import torch as _torch
+_GPU_AVAILABLE = _torch.cuda.is_available()
+
 from core.barbell import barbell_tracker, warmup as _barbell_warmup
 
 _barbell_warmup()
@@ -278,7 +281,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         return
 
     fps              = cap.get(cv2.CAP_PROP_FPS) or 30
-    INFER_MAX_DIM    = 480
+    INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 480
     OVERLAY_DURATION = int(fps * 3)
 
     DISPLAY_FPS    = min(fps, 25.0)
@@ -459,7 +462,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         return
 
     fps              = cap.get(cv2.CAP_PROP_FPS) or 30
-    INFER_MAX_DIM    = 320 
+    INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 320
     OVERLAY_DURATION = int(fps * 3)
 
     vid_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

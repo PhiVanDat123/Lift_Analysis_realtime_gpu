@@ -1,9 +1,31 @@
-mediapipe
-python-dotenv
-opencv-python
-gradio
+# ── Core ──────────────────────────────────────────────────────────────────────
 numpy
-imageio[ffmpeg]
+opencv-python
+python-dotenv
+
+# ── Pose estimation ───────────────────────────────────────────────────────────
+mediapipe
+
+# ── Barbell detection ─────────────────────────────────────────────────────────
+# YOLO local backend
 ultralytics>=8.3.0
+
+# Roboflow cloud backend (optional — only needed if ROBOFLOW_API_KEY is set)
 roboflow
 inference
+
+# ── GPU acceleration ──────────────────────────────────────────────────────────
+# PyTorch with CUDA 12.1 (RTX 2000 Ada / any RTX 30xx/40xx/50xx)
+# Install manually BEFORE pip install -r requirements.txt:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+# CPU-only fallback (if no GPU):
+#   pip install torch torchvision
+#
+# DO NOT put torch here — the index-url cannot be specified in requirements.txt
+
+# ── UI / serving ──────────────────────────────────────────────────────────────
+gradio
+imageio[ffmpeg]
+Pillow
