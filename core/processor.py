@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue as _queue
 import socket
 import sys
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -450,6 +451,138 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     )
     yield last_frame_rgb, summary
 
+def process_video_file(video_path: Optional[str], exercise: str):
+    """
+    Process entire video, write annotated frames to a temp mp4 file,
+    yield (None, feedback_text) during processing for real-time text updates,
+    then yield (output_path, summary) at the end for smooth native video playback.
+    """
+    if video_path is None:
+        return
+
+    checker = EXERCISE_CHECKERS[exercise]
+    checker.reset_state()
+    barbell_tracker.reset()
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return
+
+    fps    = cap.get(cv2.CAP_PROP_FPS) or 30
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+
+    INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 480
+    OVERLAY_DURATION = int(fps * 3)
+
+    # Temp output file
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    out_path = tmp.name
+    tmp.close()
+    writer = cv2.VideoWriter(
+        out_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (width, height),
+    )
+
+    stage            = ""
+    counter          = 0
+    last_score: Optional[int] = None
+    rep_scores:    list = []
+    rep_feedbacks: list = []
+    overlay_cache: Optional[np.ndarray] = None
+    overlay_frames_left = 0
+    prev_counter     = 0
+    feedback         = "Đang xử lý..."
+    frame_idx        = 0
+
+    # Parallel barbell detection
+    _pool = ThreadPoolExecutor(max_workers=1)
+
+    yield None, "Đang xử lý video..."
+
+    while cap.isOpened():
+        ret, frame_bgr = cap.read()
+        if not ret:
+            break
+
+        frame_idx += 1
+
+        # Resize for inference
+        h, w  = frame_bgr.shape[:2]
+        scale = min(1.0, INFER_MAX_DIM / max(h, w))
+        infer_bgr = cv2.resize(frame_bgr, (int(w * scale), int(h * scale))) if scale < 1.0 else frame_bgr
+        infer_rgb = cv2.cvtColor(infer_bgr, cv2.COLOR_BGR2RGB)
+
+        # Pose + barbell in parallel
+        barbell_fut = _pool.submit(barbell_tracker.detect, infer_rgb) if barbell_tracker.enabled else None
+        results     = pose_detector.process(infer_rgb)
+        detection   = barbell_fut.result() if barbell_fut else None
+
+        landmarks = results.pose_landmarks
+        kp = angles_snap = None
+        if landmarks:
+            kp          = extract_keypoints(landmarks)
+            angles_snap = compute_angles(kp)
+            new_stage, rep_done, issues = checker.check(angles_snap, kp, stage)
+            stage = new_stage
+            if rep_done:
+                counter   += 1
+                sc         = compute_score(issues, checker.rep_metrics, exercise)
+                last_score = sc
+                feedback   = (
+                    f"Rep {counter} — Score: {sc}/100 ({score_label(sc)})\n"
+                    + "\n".join(issues)
+                )
+                rep_scores.append(sc)
+                rep_feedbacks.append(
+                    f"Rep {counter} - {sc}/100 ({score_label(sc)}):\n{feedback}"
+                )
+
+        # Draw annotations on full-res frame
+        annotated = frame_bgr.copy()
+
+        if counter > prev_counter:
+            issue_lines   = [l for l in feedback.split("\n") if not l.startswith("Rep")]
+            overlay_lines = [f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"] + issue_lines
+            overlay_cache       = _build_overlay_cache(annotated.shape, overlay_lines)
+            overlay_frames_left = OVERLAY_DURATION
+            prev_counter        = counter
+
+        if landmarks:
+            _draw_exercise_landmarks(annotated, landmarks, exercise)
+        if kp and angles_snap:
+            _draw_angle_markers(annotated, kp, angles_snap, exercise)
+        if barbell_tracker.enabled:
+            barbell_tracker.draw(annotated, detection)
+        _draw_hud(annotated, stage, counter, last_score)
+
+        if overlay_frames_left > 0 and overlay_cache is not None:
+            _blit_overlay(annotated, overlay_cache)
+            overlay_frames_left -= 1
+
+        writer.write(annotated)
+
+        # Yield text feedback every 30 frames so UI stays responsive
+        if frame_idx % 30 == 0:
+            progress = int(frame_idx / total * 100)
+            yield None, f"Đang xử lý... {progress}%\n\n{feedback}"
+
+    cap.release()
+    writer.release()
+    _pool.shutdown(wait=False)
+
+    avg     = int(sum(rep_scores) / len(rep_scores)) if rep_scores else 0
+    summary = (
+        f"Tổng số rep   : {counter}\n"
+        f"Điểm TB       : {avg}/100 ({score_label(avg)})\n\n"
+        + "\n---\n".join(rep_feedbacks)
+    )
+    yield out_path, summary
+
+
 def process_video_streaming(video_path: Optional[str], exercise: str):
     if video_path is None:
         return
@@ -483,9 +616,10 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     _pool = ThreadPoolExecutor(max_workers=1)
 
     _stream_state["active"].set()
+    # Use relative URL /stream so it works on any host (localhost, RunPod, etc.)
     _HTML = (
         f'<div style="display:flex;justify-content:center;align-items:flex-start;">'
-        f'<img src="http://localhost:{MJPEG_PORT}/?t={token}" '
+        f'<img src="/stream?t={token}" '
         f'style="width:{DISPLAY_W}px;height:{DISPLAY_H}px;object-fit:fill;">'
         f'</div>'
     )

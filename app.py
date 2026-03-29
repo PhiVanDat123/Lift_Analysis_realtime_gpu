@@ -1,10 +1,34 @@
 """
 Gradio UI entry point.
 All business logic lives in core/.
+
+MJPEG stream is mounted at /stream on the same port as Gradio,
+so it works on localhost AND remote hosts (RunPod, etc.) without
+needing to expose a second port.
 """
 import gradio as gr
+from fastapi import Response
+from fastapi.responses import StreamingResponse
 
-from core.processor import process_video_realtime
+from core.processor import process_video_streaming, _stream_state
+
+
+def _mjpeg_generator():
+    import queue
+    while True:
+        active = _stream_state["active"].is_set()
+        try:
+            frame_jpg = _stream_state["queue"].get(timeout=0.1)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + frame_jpg
+                + b"\r\n"
+            )
+        except queue.Empty:
+            if not active and _stream_state["queue"].empty():
+                break
+
 
 with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     gr.Markdown("# AI Exercise Pose Feedback")
@@ -17,8 +41,11 @@ with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     )
 
     with gr.Row():
-        video_input  = gr.Video(label="Video đầu vào", sources=["upload"], height=480)
-        video_output = gr.Image(label="Phân tích real-time", height=480)
+        video_input   = gr.Video(label="Video đầu vào", sources=["upload"], height=480)
+        video_display = gr.HTML(
+            '<p style="color:#888;font-size:14px;padding:16px;">Upload video và nhấn Phân tích để bắt đầu.</p>',
+            label="Phân tích real-time",
+        )
 
     video_feedback = gr.Textbox(
         label="Phản hồi tư thế",
@@ -29,10 +56,24 @@ with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     analyze_btn = gr.Button("Phân tích video", variant="primary")
 
     analyze_btn.click(
-        fn=process_video_realtime,
+        fn=process_video_streaming,
         inputs=[video_input, exercise_radio],
-        outputs=[video_output, video_feedback],
+        outputs=[video_display, video_feedback],
     )
 
+
+# Mount MJPEG endpoint on same port as Gradio via FastAPI
+app = demo.app  # Gradio exposes the underlying FastAPI app
+
+@app.get("/stream")
+def stream():
+    return StreamingResponse(
+        _mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+    )
+
+
 if __name__ == "__main__":
-    demo.launch()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
