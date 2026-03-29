@@ -4,15 +4,9 @@ All business logic lives in core/.
 """
 import gradio as gr
 
-from core.processor import process_video_streaming
+from core.processor import process_video_realtime
 
-_css = """
-#zen-output { border: none !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
-#zen-output.generating { border: none !important; animation: none !important; }
-#zen-output > .wrap { border-top: none !important; padding-top: 0 !important; }
-"""
-
-with gr.Blocks(title="AI Exercise Pose Feedback", css=_css) as demo:
+with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     gr.Markdown("# AI Exercise Pose Feedback")
     gr.Markdown("Chọn bài tập, upload video và nhận phản hồi tư thế theo thời gian thực.")
 
@@ -23,12 +17,8 @@ with gr.Blocks(title="AI Exercise Pose Feedback", css=_css) as demo:
     )
 
     with gr.Row():
-        video_input = gr.Video(label="Video đầu vào", sources=["upload"], height=480)
-        video_display = gr.HTML(
-            '<p style="color:#888;font-size:14px;padding:16px;">Upload video và nhấn Phân tích để bắt đầu.</p>',
-            label="Phân tích real-time",
-            elem_id="zen-output",
-        )
+        video_input  = gr.Video(label="Video đầu vào", sources=["upload"], height=480)
+        video_output = gr.Image(label="Phân tích real-time", height=480)
 
     video_feedback = gr.Textbox(
         label="Phản hồi tư thế",
@@ -39,9 +29,9 @@ with gr.Blocks(title="AI Exercise Pose Feedback", css=_css) as demo:
     analyze_btn = gr.Button("Phân tích video", variant="primary")
 
     analyze_btn.click(
-        fn=process_video_streaming,
+        fn=process_video_realtime,
         inputs=[video_input, exercise_radio],
-        outputs=[video_display, video_feedback],
+        outputs=[video_output, video_feedback],
     )
 
 if __name__ == "__main__":
