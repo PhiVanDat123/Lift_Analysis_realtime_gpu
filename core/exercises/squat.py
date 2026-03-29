@@ -1,14 +1,3 @@
-"""
-Barbell Back Squat checker.
-
-Detect  : hips, knees, shoulders, ankles + barbell position
-Analyze :
-  - Bar path (forward / backward drift)
-  - Squat depth (below parallel)
-  - Knees collapsing inward
-  - Left / right imbalance
-  - Torso angle consistency
-"""
 from __future__ import annotations
 
 import numpy as np
@@ -17,23 +6,25 @@ from core.exercises.base import BaseExercise
 
 class SquatChecker(BaseExercise):
 
-    # Phase thresholds
-    KNEE_DOWN = 100   # degrees — at or below = down
-    KNEE_UP   = 160   # degrees — at or above = up
+    KNEE_DOWN = 100
+    KNEE_UP   = 160
 
-    MIN_BAR_VERTICAL = 0.03   # any detectable vertical movement qualifies
+    MIN_BAR_VERTICAL = 0.03
 
-    # Rule thresholds
-    IMBALANCE_THRESHOLD   = 15    # deg difference left vs right
-    TORSO_STD_THRESHOLD   = 12    # deg std-dev of hip angle during down phase
-    BAR_DRIFT_THRESHOLD   = 0.05  # normalised horizontal displacement
+    TORSO_STD_THRESHOLD   = 12
+    BAR_DRIFT_THRESHOLD   = 0.05
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._torso_angles: list[float] = []   # hip angles during down phase
-        self._min_knee: float = 180.0           # lowest knee angle reached this rep
+        self._torso_angles: list[float] = []
+        self._min_knee: float = 180.0
 
-    def check(self, angles, kp, stage):
+    def reset_state(self) -> None:
+        super().reset_state()
+        self._torso_angles.clear()
+        self._min_knee = 180.0
+
+    def check(self, angles, kp, stage):  
         angles   = self.smooth(angles)
         avg_knee = (angles["left_knee"] + angles["right_knee"]) / 2
         new_stage = stage
@@ -50,55 +41,52 @@ class SquatChecker(BaseExercise):
                 rep_completed = False
         issues: list[str] = []
 
-        # ── Track torso angle and depth during down phase ─────────────────────
         avg_hip = (angles["left_hip"] + angles["right_hip"]) / 2
+
         if new_stage == "down":
-            self._torso_angles.append(avg_hip)
             self._min_knee = min(self._min_knee, avg_knee)
 
-        # ── Continuous checks (accumulated, reported at rep end) ──────────────
+        # Track torso angle across full rep (down + up) for consistency check
+        if new_stage in ("down", "up"):
+            self._torso_angles.append(avg_hip)
 
-        # 1. Knee cave
-        left_cave  = kp["left_knee"][0]  > kp["left_ankle"][0]
-        right_cave = kp["right_knee"][0] < kp["right_ankle"][0]
-        if left_cave or right_cave:
-            issues.append("⚠️ Knees caving in")
-
-        # 2. Excessive forward lean
         if new_stage == "down" and avg_hip < 50:
-            issues.append("⚠️ Too much forward lean")
+            issues.append("Too much forward lean")
 
-        # 3. Left/right imbalance
-        knee_diff = abs(angles["left_knee"] - angles["right_knee"])
-        hip_diff  = abs(angles["left_hip"]  - angles["right_hip"])
-        if knee_diff > self.IMBALANCE_THRESHOLD or hip_diff > self.IMBALANCE_THRESHOLD:
-            issues.append("⚠️ Left/right imbalance")
-
-        # ── Per-rep checks (on completion) ────────────────────────────────────
         if rep_completed:
 
-            # 4. Squat depth — use lowest knee angle reached during down phase
-            if self._min_knee <= self.KNEE_DOWN:
-                issues.append("✅ Good depth")
-            else:
-                issues.append("⚠️ Not deep enough")
-            self._min_knee = 180.0
+            worst_lean = min(self._torso_angles) if self._torso_angles else 90.0
+            torso_std  = (float(np.std(self._torso_angles))
+                          if len(self._torso_angles) >= 5 else 0.0)
 
-            # 5. Torso angle consistency
-            if len(self._torso_angles) >= 5:
-                std = float(np.std(self._torso_angles))
-                if std > self.TORSO_STD_THRESHOLD:
-                    issues.append("⚠️ Inconsistent torso angle")
-            self._torso_angles.clear()
-
-            # 6. Barbell path direction
+            bar_drift = 0.0
+            h_disp    = None
             if self.barbell_tracker and self.barbell_tracker.enabled:
                 h_disp = self.barbell_tracker.horizontal_displacement()
-                if h_disp is not None and abs(h_disp) > self.BAR_DRIFT_THRESHOLD:
-                    issues.append("⚠️ Bar drifting forward")
-                self.barbell_tracker.reset()
+                if h_disp is not None:
+                    bar_drift = abs(h_disp)
 
-            if not any(i.startswith("⚠️") for i in issues):
-                issues = ["✅ Good rep!"]
+            self.rep_metrics = {
+                "min_knee":   self._min_knee,
+                "worst_lean": worst_lean,
+                "torso_std":  torso_std,
+                "bar_drift":  bar_drift,
+            }
+
+            if self._min_knee <= self.KNEE_DOWN:
+                issues.append("Good depth")
+            else:
+                issues.append("Not deep enough")
+            self._min_knee = 180.0
+
+            if torso_std > self.TORSO_STD_THRESHOLD:
+                issues.append("Inconsistent torso angle")
+            self._torso_angles.clear()
+
+            if self.barbell_tracker and self.barbell_tracker.enabled:
+                if h_disp is not None and bar_drift > self.BAR_DRIFT_THRESHOLD:
+                    direction = "forward" if h_disp > 0 else "backward"
+                    issues.append(f"Bar drifting {direction}")
+                self.barbell_tracker.reset()
 
         return new_stage, rep_completed, issues

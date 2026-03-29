@@ -1,20 +1,3 @@
-"""
-Barbell detection & path tracking.
-
-Backend priority (auto-selected at startup):
-  1. Roboflow Inference SDK  — if ROBOFLOW_API_KEY env-var is set
-  2. Local YOLO weights      — if models/barbell.pt exists
-  3. Disabled (no-op)        — graceful degradation, rest of app still works
-
-To enable option 1:
-    set ROBOFLOW_API_KEY=your_key        # Windows
-    export ROBOFLOW_API_KEY=your_key     # Linux/macOS
-    pip install inference
-
-To enable option 2:
-    python download_model.py --api-key YOUR_KEY
-    pip install ultralytics>=8.3.0
-"""
 from __future__ import annotations
 
 import os
@@ -26,18 +9,13 @@ import cv2
 import numpy as np
 from dotenv import load_dotenv
 
-load_dotenv()  # load .env from project root (or any parent directory)
-
-# ── Config ────────────────────────────────────────────────────────────────────
+load_dotenv()  
 
 MODEL_ID   = "barbell-zwl3l-ambrq/1"
 MODEL_PATH = Path(__file__).parent.parent / "models" / "barbell.pt"
 
-# Lowered to 0.20 because model mAP is moderate (34.8%)
 CONF_THRESHOLD  = 0.20
-DRIFT_THRESHOLD = 0.03   # horizontal std-dev > 3 % of frame width = drift
-
-# ── Lazy backend loaders ──────────────────────────────────────────────────────
+DRIFT_THRESHOLD = 0.03   
 
 _rf_model   = None
 _yolo_model = None
@@ -46,7 +24,7 @@ _yolo_model = None
 def _load_rf_model():
     global _rf_model
     if _rf_model is None:
-        from inference import get_model  # noqa: PLC0415
+        from inference import get_model  
         _rf_model = get_model(
             model_id=MODEL_ID,
             api_key=os.environ["ROBOFLOW_API_KEY"],
@@ -57,7 +35,7 @@ def _load_rf_model():
 def _load_yolo_model():
     global _yolo_model
     if _yolo_model is None:
-        from ultralytics import YOLO  # noqa: PLC0415
+        from ultralytics import YOLO  
         _yolo_model = YOLO(str(MODEL_PATH))
     return _yolo_model
 
@@ -69,18 +47,7 @@ def _pick_backend() -> str:
         return "local"
     return "none"
 
-
-# ── BarbellTracker ────────────────────────────────────────────────────────────
-
 class BarbellTracker:
-    """
-    Detects the barbell in each frame and records its centre-point history.
-
-    Path analysis
-    -------------
-    - Horizontal std-dev → bar drift left/right (should stay near 0 for all lifts)
-    - Vertical range      → bar travel distance
-    """
 
     def __init__(self, history_len: int = 60):
         self._history: deque[tuple[float, float]] = deque(maxlen=history_len)
@@ -95,13 +62,8 @@ class BarbellTracker:
     def backend(self) -> str:
         return self._backend
 
-    # ── Detection ────────────────────────────────────────────────────────────
 
     def detect(self, frame_rgb: np.ndarray) -> Optional[tuple[float, float, float, float]]:
-        """
-        Returns (cx, cy, bw, bh) normalised [0,1], or None.
-        Coordinates are relative to *frame_rgb* dimensions.
-        """
         if not self.enabled:
             return None
         h, w = frame_rgb.shape[:2]
@@ -125,7 +87,6 @@ class BarbellTracker:
                 conf = float(pred.confidence)
                 if conf > best_conf:
                     best_conf = conf
-                    # pred.x / pred.y are pixel-space centre coords
                     cx = float(pred.x) / w
                     cy = float(pred.y) / h
                     bw = float(pred.width)  / w
@@ -161,8 +122,6 @@ class BarbellTracker:
             print(f"[barbell] local detect error: {e}")
         return None
 
-    # ── Path analysis ─────────────────────────────────────────────────────────
-
     def path_deviation(self) -> Optional[float]:
         if len(self._history) < 5:
             return None
@@ -173,60 +132,35 @@ class BarbellTracker:
         return dev is not None and dev > DRIFT_THRESHOLD
 
     def horizontal_displacement(self) -> Optional[float]:
-        """
-        Net horizontal movement: last_x - first_x, normalised [0,1].
-        Positive = moved right, negative = moved left.
-        Returns None if fewer than 3 data points.
-        """
         if len(self._history) < 3:
             return None
         return float(self._history[-1][0] - self._history[0][0])
 
     def vertical_range(self) -> Optional[float]:
-        """
-        Total vertical travel: max_y - min_y over history, normalised [0,1].
-        Y increases downward, so a large value means the bar moved a lot vertically.
-        Returns None if fewer than 5 data points.
-        """
         if len(self._history) < 5:
             return None
         ys = [p[1] for p in self._history]
         return float(max(ys) - min(ys))
 
     def bar_direction(self, window: int = 5) -> Optional[str]:
-        """
-        Returns "up", "down", or None (not enough data / stationary).
-        Uses last *window* frames of Y history.
-        Y increases downward, so:
-          dy > 0  → bar moving down toward chest
-          dy < 0  → bar moving up toward lockout
-        """
         if len(self._history) < window:
             return None
         ys  = [p[1] for p in list(self._history)[-window:]]
         dy  = ys[-1] - ys[0]
-        if dy >  0.015:   # bar clearly descending
+        if dy >  0.015:   
             return "down"
-        if dy < -0.015:   # bar clearly ascending
+        if dy < -0.015:   
             return "up"
-        return None       # stationary / noise
+        return None       
 
     def reset(self) -> None:
         self._history.clear()
         self._last_raw = None
 
-    # ── Drawing ───────────────────────────────────────────────────────────────
 
     def draw(self, frame_bgr: np.ndarray, detection: Optional[tuple]) -> None:
-        """
-        Draw bounding box + path trail in-place.
-        Uses *detection* for the box, self._history for the trail.
-        Shows a status label even when detection is None (tracker active but no hit).
-        """
         h, w = frame_bgr.shape[:2]
 
-
-        # Bounding box (current or last cached detection)
         box = detection if detection is not None else self._last_raw
         if box is not None:
             cx, cy, bw, bh = box
@@ -236,24 +170,16 @@ class BarbellTracker:
             y2 = int((cy + bh / 2) * h)
             cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
-        # Path trail — thick orange line connecting all history points
         if len(self._history) >= 2:
             pts = [(int(p[0] * w), int(p[1] * h)) for p in self._history]
             for i in range(1, len(pts)):
                 cv2.line(frame_bgr, pts[i - 1], pts[i], (0, 165, 255), 4)
-            # Most recent point: red dot
             cv2.circle(frame_bgr, pts[-1], 8, (0, 0, 255), -1)
 
-
-# Module-level singleton
 barbell_tracker = BarbellTracker()
 
 
 def warmup() -> None:
-    """
-    Pre-load the barbell model at app startup so the first frame
-    doesn't stall. Safe to call even when tracker is disabled.
-    """
     if not barbell_tracker.enabled:
         print("[barbell] No backend available — tracking disabled.")
         print("  → Set ROBOFLOW_API_KEY  (inference SDK)")

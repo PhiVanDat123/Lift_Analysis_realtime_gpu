@@ -1,6 +1,3 @@
-"""
-MediaPipe pose detection wrapper and geometry helpers.
-"""
 import numpy as np
 import mediapipe as mp
 
@@ -16,7 +13,6 @@ pose_detector = mp_pose.Pose(
 
 
 def calculate_angle(a, b, c) -> float:
-    """Angle at vertex b formed by points a-b-c (degrees)."""
     a, b, c = np.array(a[:2]), np.array(b[:2]), np.array(c[:2])
     radians = (
         np.arctan2(c[1] - b[1], c[0] - b[0])
@@ -51,7 +47,6 @@ def extract_keypoints(pose_landmarks) -> dict:
 
 
 def joints_visible(kp: dict, *keys: str, threshold: float = 0.5) -> bool:
-    """Return True only if all named joints have visibility ≥ threshold."""
     return all(kp[k][2] >= threshold for k in keys)
 
 
