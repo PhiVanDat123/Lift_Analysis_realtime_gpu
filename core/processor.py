@@ -284,8 +284,12 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 480
     OVERLAY_DURATION = int(fps * 3)
 
-    DISPLAY_FPS    = min(fps, 25.0)
+    # Gradio gr.Image streams via WebSocket — cap at 12fps to avoid lag
+    DISPLAY_FPS    = 12.0
     FRAME_INTERVAL = 1.0 / DISPLAY_FPS
+    # Read every Nth frame to keep pace with display rate
+    SKIP_FRAMES    = max(1, round(fps / DISPLAY_FPS))
+    frame_idx      = 0
 
     _lock  = threading.Lock()
     _state = {
@@ -347,17 +351,19 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     worker = threading.Thread(target=_infer_worker, daemon=True)
     worker.start()
 
-    overlay_cache:        Optional[np.ndarray] = None   
+    overlay_cache:        Optional[np.ndarray] = None
     overlay_frames_left:  int = 0
     prev_counter:         int = 0
     last_frame_rgb: Optional[np.ndarray] = None
-    DISPLAY_MAX = 720
+    DISPLAY_MAX = 480   # smaller = less WebSocket payload = less lag
     next_yield_time = time.monotonic()
 
     while cap.isOpened():
         ret, frame_bgr = cap.read()
         if not ret:
             break
+
+        frame_idx += 1
 
         h, w  = frame_bgr.shape[:2]
         scale = min(1.0, INFER_MAX_DIM / max(h, w))
@@ -370,7 +376,11 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         try:
             infer_q.put_nowait(infer_rgb)
         except _queue.Full:
-            pass  
+            pass
+
+        # Skip frames — only render and yield every Nth frame
+        if frame_idx % SKIP_FRAMES != 0:
+            continue
 
         annotated = frame_bgr.copy()
 
