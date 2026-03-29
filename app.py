@@ -2,19 +2,24 @@
 Gradio UI entry point.
 All business logic lives in core/.
 
-MJPEG stream is mounted at /stream on the same port as Gradio,
-so it works on localhost AND remote hosts (RunPod, etc.) without
-needing to expose a second port.
+FastAPI app is created first, /stream route added, then Gradio mounted —
+so MJPEG stream works on the same port as Gradio on any host (RunPod, etc.).
 """
+import queue
+
 import gradio as gr
-from fastapi import Response
+from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 
 from core.processor import process_video_streaming, _stream_state
 
 
+# ── FastAPI app with MJPEG route ──────────────────────────────────────────────
+
+app = FastAPI()
+
+
 def _mjpeg_generator():
-    import queue
     while True:
         active = _stream_state["active"].is_set()
         try:
@@ -29,6 +34,17 @@ def _mjpeg_generator():
             if not active and _stream_state["queue"].empty():
                 break
 
+
+@app.get("/stream")
+def stream():
+    return StreamingResponse(
+        _mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+    )
+
+
+# ── Gradio UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     gr.Markdown("# AI Exercise Pose Feedback")
@@ -62,17 +78,9 @@ with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     )
 
 
-# Mount MJPEG endpoint on same port as Gradio via FastAPI
-app = demo.app  # Gradio exposes the underlying FastAPI app
+# ── Mount Gradio onto FastAPI, then run ───────────────────────────────────────
 
-@app.get("/stream")
-def stream():
-    return StreamingResponse(
-        _mjpeg_generator(),
-        media_type="multipart/x-mixed-replace; boundary=frame",
-        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
-    )
-
+app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
     import uvicorn
