@@ -20,6 +20,14 @@ app = FastAPI()
 
 
 def _mjpeg_generator():
+    import time
+    # Wait up to 30s for processing to start (handles race between img load & button click)
+    deadline = time.time() + 30
+    while not _stream_state["active"].is_set():
+        if time.time() > deadline:
+            return
+        time.sleep(0.05)
+
     while True:
         active = _stream_state["active"].is_set()
         try:
@@ -40,7 +48,11 @@ def stream():
     return StreamingResponse(
         _mjpeg_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame",
-        headers={"Cache-Control": "no-cache", "Access-Control-Allow-Origin": "*"},
+        headers={
+            "Cache-Control": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+            "X-Accel-Buffering": "no",   # tell nginx/RunPod proxy not to buffer
+        },
     )
 
 
