@@ -352,7 +352,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     worker = threading.Thread(target=_infer_worker, daemon=True)
     worker.start()
 
-    overlay_cache:        Optional[np.ndarray] = None
+    rep_overlay_lines:    list = []
     overlay_frames_left:  int = 0
     prev_counter:         int = 0
     last_frame_rgb: Optional[np.ndarray] = None
@@ -396,11 +396,10 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
             feedback   = _state["feedback"]
 
         if counter > prev_counter:
-            issue_lines = [l for l in feedback.split("\n") if not l.startswith("Score:")]
-            overlay_lines = [
+            issue_lines       = [l for l in feedback.split("\n") if not l.startswith("Score:")]
+            rep_overlay_lines = [
                 f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"
             ] + issue_lines
-            overlay_cache       = _build_overlay_cache(annotated.shape, overlay_lines)
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
 
@@ -410,11 +409,13 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
             _draw_angle_markers(annotated, kp, angles_snap, exercise)
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
-        _draw_hud(annotated, stage, counter, last_score)
 
-        if overlay_frames_left > 0 and overlay_cache is not None:
-            _blit_overlay(annotated, overlay_cache)
+        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        if overlay_frames_left > 0 and rep_overlay_lines:
+            _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
+        else:
+            _draw_feedback_overlay(annotated, [stage_line])
 
         dh, dw = annotated.shape[:2]
         if max(dh, dw) > DISPLAY_MAX:
@@ -492,7 +493,7 @@ def process_video_file(video_path: Optional[str], exercise: str):
     last_score: Optional[int] = None
     rep_scores:    list = []
     rep_feedbacks: list = []
-    overlay_cache: Optional[np.ndarray] = None
+    rep_overlay_lines: list = []
     overlay_frames_left = 0
     prev_counter     = 0
     feedback         = "Đang xử lý..."
@@ -545,9 +546,8 @@ def process_video_file(video_path: Optional[str], exercise: str):
         annotated = frame_bgr.copy()
 
         if counter > prev_counter:
-            issue_lines   = [l for l in feedback.split("\n") if not l.startswith("Rep")]
-            overlay_lines = [f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"] + issue_lines
-            overlay_cache       = _build_overlay_cache(annotated.shape, overlay_lines)
+            issue_lines       = [l for l in feedback.split("\n") if not l.startswith("Rep")]
+            rep_overlay_lines = [f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
 
@@ -557,11 +557,13 @@ def process_video_file(video_path: Optional[str], exercise: str):
             _draw_angle_markers(annotated, kp, angles_snap, exercise)
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
-        _draw_hud(annotated, stage, counter, last_score)
 
-        if overlay_frames_left > 0 and overlay_cache is not None:
-            _blit_overlay(annotated, overlay_cache)
+        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        if overlay_frames_left > 0 and rep_overlay_lines:
+            _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
+        else:
+            _draw_feedback_overlay(annotated, [stage_line])
 
         writer.write(annotated)
 
@@ -625,7 +627,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     )
     yield _HTML, "Đang xử lý..."
 
-    overlay_cache:       Optional[np.ndarray] = None
+    rep_overlay_lines:   list = []
     overlay_frames_left: int = 0
     prev_counter:        int = 0
     cur_feedback:        str = ""
@@ -680,11 +682,10 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         annotated = frame_bgr.copy()
 
         if counter > prev_counter:
-            issue_lines   = [l for l in feedback.split("\n") if not l.startswith("Score:")]
-            overlay_lines = [
+            issue_lines        = [l for l in feedback.split("\n") if not l.startswith("Score:")]
+            rep_overlay_lines  = [
                 f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"
             ] + issue_lines
-            overlay_cache       = _build_overlay_cache(annotated.shape, overlay_lines)
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
 
@@ -694,11 +695,13 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
             _draw_angle_markers(annotated, kp, angles_snap, exercise)
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
-        _draw_hud(annotated, stage, counter, last_score)
 
-        if overlay_frames_left > 0 and overlay_cache is not None:
-            _blit_overlay(annotated, overlay_cache)
+        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        if overlay_frames_left > 0 and rep_overlay_lines:
+            _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
+        else:
+            _draw_feedback_overlay(annotated, [stage_line])
 
         _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
         try:
