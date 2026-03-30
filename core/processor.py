@@ -171,9 +171,12 @@ def _draw_angle_markers(
     angles: dict,
     exercise: str,
 ) -> None:
+    import math as _math
     if exercise != "Bench Press":
         return
     h, w = frame_bgr.shape[:2]
+
+    # Elbow angle arcs
     configs = [
         ("left_shoulder",  "left_elbow",  "left_wrist",  "left_elbow",  (0, 255, 255)),
         ("right_shoulder", "right_elbow", "right_wrist", "right_elbow", (0, 200, 255)),
@@ -187,6 +190,22 @@ def _draw_angle_markers(
         cv2.putText(frame_bgr, f"{angles[ang_key]:.0f}deg",
                     (vx[0] + 10, vx[1] - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
+
+    # Back angle: shoulder-hip midpoint line vs horizontal
+    sx = int((kp["left_shoulder"][0] + kp["right_shoulder"][0]) / 2 * w)
+    sy = int((kp["left_shoulder"][1] + kp["right_shoulder"][1]) / 2 * h)
+    hx = int((kp["left_hip"][0]      + kp["right_hip"][0])      / 2 * w)
+    hy = int((kp["left_hip"][1]      + kp["right_hip"][1])      / 2 * h)
+    dx = abs(hx - sx)
+    dy = abs(hy - sy)
+    back_angle = _math.degrees(_math.atan2(dy, dx)) if dx > 2 else 0.0
+    color_back = (0, 80, 255) if back_angle > 20 else (0, 200, 80)
+    cv2.line(frame_bgr, (sx, sy), (hx, hy), color_back, 2)
+    cv2.line(frame_bgr, (sx, sy), (sx + dx, sy), (160, 160, 160), 1)
+    mid_x, mid_y = (sx + hx) // 2, (sy + hy) // 2
+    cv2.putText(frame_bgr, f"Back:{back_angle:.0f}deg",
+                (mid_x + 6, mid_y - 6),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, color_back, 2)
 
 
 def _clean(line: str) -> str:

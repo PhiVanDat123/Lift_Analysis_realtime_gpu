@@ -89,9 +89,9 @@ def _bench_score(m: dict) -> int:
         [15,  11,   6,   1,   0],
     )
     arch = _pts(
-        m.get("worst_arch", 130),
-        [125, 138, 148, 155, 165],
-        [ 15,  12,   7,   2,   0],
+        m.get("worst_back_angle", 0),
+        [ 0,  10,  20,  30,  45],
+        [15,  13,   8,   2,   0],
     )
     wrist = _pts(
         m.get("worst_wrist_bend", 0),

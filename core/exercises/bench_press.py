@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import numpy as np
 from core.exercises.base import BaseExercise
 
@@ -25,10 +26,10 @@ class BenchPressChecker(BaseExercise):
         self._max_elbow: float = 0.0
         self._bottom_y:      list[float] = []  
         self._rep_min_bar_y: float = 1.0       
-        self._worst_flare:      float = 0.0
-        self._worst_arch:       float = 0.0
-        self._lockout_diff_val: float = 0.0
-        self._worst_wrist_bend: float = 0.0
+        self._worst_flare:       float = 0.0
+        self._worst_back_angle:  float = 0.0
+        self._lockout_diff_val:  float = 0.0
+        self._worst_wrist_bend:  float = 0.0
 
     def reset_state(self) -> None:
         super().reset_state()
@@ -37,7 +38,7 @@ class BenchPressChecker(BaseExercise):
         self._bottom_y.clear()
         self._rep_min_bar_y    = 1.0
         self._worst_flare      = 0.0
-        self._worst_arch       = 0.0
+        self._worst_back_angle = 0.0
         self._lockout_diff_val = 0.0
         self._worst_wrist_bend = 0.0
 
@@ -85,9 +86,16 @@ class BenchPressChecker(BaseExercise):
             if avg_shoulder > self.ELBOW_FLARE_MAX:
                 issues.append("Elbows flaring too much")
 
-        avg_hip = (angles["left_hip"] + angles["right_hip"]) / 2
-        self._worst_arch = max(self._worst_arch, avg_hip)
-        if avg_hip > 155:
+        # Back angle = angle of shoulder→hip line to horizontal
+        sx = (kp["left_shoulder"][0] + kp["right_shoulder"][0]) / 2
+        sy = (kp["left_shoulder"][1] + kp["right_shoulder"][1]) / 2
+        hx = (kp["left_hip"][0]      + kp["right_hip"][0])      / 2
+        hy = (kp["left_hip"][1]      + kp["right_hip"][1])      / 2
+        dx = abs(hx - sx)
+        dy = abs(hy - sy)
+        back_angle = math.degrees(math.atan2(dy, dx)) if dx > 0.01 else 0.0
+        self._worst_back_angle = max(self._worst_back_angle, back_angle)
+        if back_angle > 20:
             issues.append("Excessive arch")
 
         left_wrist_bend  = abs(kp["left_wrist"][0]  - kp["left_elbow"][0])
@@ -126,19 +134,19 @@ class BenchPressChecker(BaseExercise):
                 self.barbell_tracker.reset()
 
             self.rep_metrics = {
-                "min_elbow":        self._min_elbow,
-                "max_elbow":        self._max_elbow,
-                "lockout_diff":     self._lockout_diff_val,
-                "worst_flare":      self._worst_flare,
-                "worst_arch":       self._worst_arch,
-                "worst_wrist_bend": self._worst_wrist_bend,
-                "bar_drift":        bar_drift,
+                "min_elbow":         self._min_elbow,
+                "max_elbow":         self._max_elbow,
+                "lockout_diff":      self._lockout_diff_val,
+                "worst_flare":       self._worst_flare,
+                "worst_back_angle":  self._worst_back_angle,
+                "worst_wrist_bend":  self._worst_wrist_bend,
+                "bar_drift":         bar_drift,
             }
 
             self._min_elbow        = 180.0
             self._max_elbow        = 0.0
             self._worst_flare      = 0.0
-            self._worst_arch       = 0.0
+            self._worst_back_angle = 0.0
             self._lockout_diff_val = 0.0
             self._worst_wrist_bend = 0.0
 
