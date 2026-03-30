@@ -6,7 +6,6 @@ from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from core.barbell import BarbellTracker
 
-
 class BaseExercise(ABC):
 
     _EMA_ALPHA = 0.5
@@ -14,7 +13,7 @@ class BaseExercise(ABC):
     def __init__(self, barbell_tracker: Optional["BarbellTracker"] = None):
         self.barbell_tracker    = barbell_tracker
         self._smoothed: dict[str, float] = {}
-        self.rep_metrics: dict = {}   
+        self.rep_metrics: dict = {}
 
     def smooth(self, angles: dict[str, float]) -> dict[str, float]:
         out = {}
@@ -26,6 +25,9 @@ class BaseExercise(ABC):
 
     def reset_state(self) -> None:
         self._smoothed.clear()
+
+    def finalize(self) -> tuple[bool, list[str]]:
+        return False, []
 
     @abstractmethod
     def check(

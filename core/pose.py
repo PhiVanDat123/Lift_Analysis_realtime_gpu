@@ -15,7 +15,6 @@ pose_detector = mp_pose.Pose(
     model_complexity=_complexity,
 )
 
-
 def calculate_angle(a, b, c) -> float:
     a, b, c = np.array(a[:2]), np.array(b[:2]), np.array(c[:2])
     radians = (
@@ -24,7 +23,6 @@ def calculate_angle(a, b, c) -> float:
     )
     angle = np.abs(radians * 180.0 / np.pi)
     return 360 - angle if angle > 180.0 else angle
-
 
 def extract_keypoints(pose_landmarks) -> dict:
     lm = pose_landmarks.landmark
@@ -49,10 +47,8 @@ def extract_keypoints(pose_landmarks) -> dict:
         "right_ankle":    _pt(lm[PL.RIGHT_ANKLE]),
     }
 
-
 def joints_visible(kp: dict, *keys: str, threshold: float = 0.5) -> bool:
     return all(kp[k][2] >= threshold for k in keys)
-
 
 def compute_angles(kp: dict) -> dict:
     return {
@@ -65,7 +61,6 @@ def compute_angles(kp: dict) -> dict:
         "left_knee":      calculate_angle(kp["left_hip"],       kp["left_knee"],     kp["left_ankle"]),
         "right_knee":     calculate_angle(kp["right_hip"],      kp["right_knee"],    kp["right_ankle"]),
     }
-
 
 def draw_skeleton(frame_bgr, pose_landmarks) -> None:
     mp_drawing.draw_landmarks(

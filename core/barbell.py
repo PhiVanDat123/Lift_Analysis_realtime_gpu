@@ -9,17 +9,16 @@ import cv2
 import numpy as np
 from dotenv import load_dotenv
 
-load_dotenv()  
+load_dotenv()
 
 MODEL_ID   = "barbell-zwl3l-ambrq/1"
 MODEL_PATH = Path(__file__).parent.parent / "models" / "barbell.pt"
 
 CONF_THRESHOLD  = 0.20
-DRIFT_THRESHOLD = 0.03   
+DRIFT_THRESHOLD = 0.03
 
 _rf_model   = None
 _yolo_model = None
-
 
 def _load_rf_model():
     global _rf_model
@@ -31,7 +30,6 @@ def _load_rf_model():
         )
     return _rf_model
 
-
 def _load_yolo_model():
     global _yolo_model
     if _yolo_model is None:
@@ -42,7 +40,6 @@ def _load_yolo_model():
         _yolo_model.to(device)
         print(f"[barbell] YOLO running on {device.upper()}")
     return _yolo_model
-
 
 def _pick_backend() -> str:
     if os.environ.get("ROBOFLOW_API_KEY"):
@@ -56,7 +53,7 @@ class BarbellTracker:
     def __init__(self, history_len: int = 60):
         self._history: deque[tuple[float, float]] = deque(maxlen=history_len)
         self._backend: str = _pick_backend()
-        self._last_raw: Optional[tuple] = None   # cached last successful detection
+        self._last_raw: Optional[tuple] = None
 
     @property
     def enabled(self) -> bool:
@@ -65,7 +62,6 @@ class BarbellTracker:
     @property
     def backend(self) -> str:
         return self._backend
-
 
     def detect(self, frame_rgb: np.ndarray) -> Optional[tuple[float, float, float, float]]:
         if not self.enabled:
@@ -151,16 +147,15 @@ class BarbellTracker:
             return None
         ys  = [p[1] for p in list(self._history)[-window:]]
         dy  = ys[-1] - ys[0]
-        if dy >  0.015:   
+        if dy >  0.015:
             return "down"
-        if dy < -0.015:   
+        if dy < -0.015:
             return "up"
-        return None       
+        return None
 
     def reset(self) -> None:
         self._history.clear()
         self._last_raw = None
-
 
     def draw(self, frame_bgr: np.ndarray, detection: Optional[tuple]) -> None:
         h, w = frame_bgr.shape[:2]
@@ -181,7 +176,6 @@ class BarbellTracker:
             cv2.circle(frame_bgr, pts[-1], 8, (0, 0, 255), -1)
 
 barbell_tracker = BarbellTracker()
-
 
 def warmup() -> None:
     if not barbell_tracker.enabled:

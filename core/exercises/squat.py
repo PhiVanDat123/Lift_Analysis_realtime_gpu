@@ -4,21 +4,20 @@ import math
 import numpy as np
 from core.exercises.base import BaseExercise
 
-
 class SquatChecker(BaseExercise):
 
     KNEE_DOWN = 100
     KNEE_UP   = 160
 
     MIN_BAR_VERTICAL       = 0.03
-    TORSO_STD_THRESHOLD    = 8     # degrees — std of hip→shoulder angle vs vertical
-    BAR_DRIFT_THRESHOLD    = 0.05  # normalised horizontal displacement
-    KNEE_COLLAPSE_RATIO    = 0.85  # knee_w / hip_w < this → collapsing
-    LR_IMBALANCE_THRESHOLD = 15    # degrees — left vs right knee angle diff
+    TORSO_STD_THRESHOLD    = 8
+    BAR_DRIFT_THRESHOLD    = 0.05
+    KNEE_COLLAPSE_RATIO    = 0.85
+    LR_IMBALANCE_THRESHOLD = 15
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._torso_angles: list[float] = []   # hip→shoulder vs vertical, per frame
+        self._torso_angles: list[float] = []
         self._min_knee:  float = 180.0
         self._worst_lean: float = 90.0
 
@@ -30,16 +29,13 @@ class SquatChecker(BaseExercise):
 
     @staticmethod
     def _torso_angle_vs_vertical(kp: dict) -> float:
-        """
-        Angle of (hip_mid → shoulder_mid) vector vs vertical (upward = 0°).
-        0° = perfectly upright, 90° = horizontal.
-        """
+        
         sx = (kp["left_shoulder"][0] + kp["right_shoulder"][0]) / 2
         sy = (kp["left_shoulder"][1] + kp["right_shoulder"][1]) / 2
         hx = (kp["left_hip"][0]      + kp["right_hip"][0])      / 2
         hy = (kp["left_hip"][1]      + kp["right_hip"][1])      / 2
         dx = sx - hx
-        dy = hy - sy   # positive = shoulder above hip (y flipped in image)
+        dy = hy - sy
         return math.degrees(math.atan2(abs(dx), max(dy, 1e-6)))
 
     def check(self, angles, kp, stage):
@@ -61,18 +57,15 @@ class SquatChecker(BaseExercise):
 
         issues: list[str] = []
 
-        # ── Torso angle vs vertical ───────────────────────────────────────────
         torso_angle = self._torso_angle_vs_vertical(kp)
         if new_stage in ("down", "up"):
             self._torso_angles.append(torso_angle)
         if torso_angle > 60 and new_stage == "down":
             issues.append("Torso: too much forward lean")
 
-        # ── Squat depth ───────────────────────────────────────────────────────
         if new_stage == "down":
             self._min_knee = min(self._min_knee, avg_knee)
 
-        # ── Knees collapsing inward ───────────────────────────────────────────
         knee_w = abs(kp["left_knee"][0] - kp["right_knee"][0])
         hip_w  = abs(kp["left_hip"][0]  - kp["right_hip"][0])
         if hip_w > 0.01 and new_stage == "down":
@@ -80,22 +73,18 @@ class SquatChecker(BaseExercise):
             if ratio < self.KNEE_COLLAPSE_RATIO:
                 issues.append("Knees collapsing inward")
 
-        # ── Left/right imbalance ──────────────────────────────────────────────
         lr_diff = abs(angles["left_knee"] - angles["right_knee"])
         if lr_diff > self.LR_IMBALANCE_THRESHOLD and new_stage == "down":
             issues.append(f"Left/right imbalance ({lr_diff:.0f}° diff)")
 
-        # ── Per-rep checks ────────────────────────────────────────────────────
         if rep_completed:
 
-            # Depth
             if self._min_knee <= self.KNEE_DOWN:
                 issues.append("Squat depth: good (below parallel)")
             else:
                 issues.append("Squat depth: not deep enough")
             self._min_knee = 180.0
 
-            # Torso consistency
             torso_std = (float(np.std(self._torso_angles))
                          if len(self._torso_angles) >= 5 else 0.0)
             worst_lean = max(self._torso_angles) if self._torso_angles else 0.0
@@ -103,14 +92,13 @@ class SquatChecker(BaseExercise):
                 issues.append("Torso: inconsistent angle across rep")
             self._torso_angles.clear()
 
-            # Bar path — forward = toward nose side
             bar_drift = 0.0
             if self.barbell_tracker and self.barbell_tracker.enabled:
                 h_disp = self.barbell_tracker.horizontal_displacement()
                 if h_disp is not None:
                     bar_drift = abs(h_disp)
                     if bar_drift > self.BAR_DRIFT_THRESHOLD:
-                        # Nose direction: nose_x vs hip_x
+
                         nose_x = kp["nose"][0]
                         hip_x  = (kp["left_hip"][0] + kp["right_hip"][0]) / 2
                         forward_sign = 1 if nose_x > hip_x else -1

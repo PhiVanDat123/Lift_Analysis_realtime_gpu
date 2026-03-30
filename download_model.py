@@ -1,24 +1,8 @@
-"""
-Download the fine-tuned barbell YOLO model from Roboflow and save it
-as models/barbell.pt for use by core/barbell.py.
 
-Usage
------
-    pip install roboflow
-    python download_model.py --api-key YOUR_ROBOFLOW_API_KEY
-
-Optional flags
---------------
-    --version INT   Model version to download (default: 1)
-    --format  STR   Export format: yolov8 | yolov5pytorch (default: yolov8)
-
-After running, the app will automatically pick up models/barbell.pt.
-"""
 import argparse
 import glob
 import shutil
 from pathlib import Path
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download barbell YOLO model from Roboflow")
@@ -43,10 +27,9 @@ def main() -> None:
     version = project.version(args.version)
     version.download(args.format)
 
-    # Locate the downloaded .pt file
     pt_files = glob.glob("barbell-zwl3l-ambrq-*/**/*.pt", recursive=True)
     if not pt_files:
-        # Fallback: search current directory tree
+
         pt_files = glob.glob("**/*.pt", recursive=True)
 
     if not pt_files:
@@ -62,7 +45,6 @@ def main() -> None:
     shutil.copy(pt_files[0], dest)
     print(f"\nModel saved to {dest}")
     print("You can now run:  python app.py")
-
 
 if __name__ == "__main__":
     main()

@@ -40,24 +40,21 @@ from core.pose import (
 from core.scoring import compute_score, score_color_bgr
 
 _stream_state: dict = {
-    "queue":  _queue.Queue(maxsize=30),  
+    "queue":  _queue.Queue(maxsize=30),
     "active": threading.Event(),
     "token":  0,
 }
-
 
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("", 0))
         return s.getsockname()[1]
 
-
 MJPEG_PORT: int = _free_port()
-
 
 class _MJPEGHandler(BaseHTTPRequestHandler):
 
-    def log_message(self, *args) -> None:  
+    def log_message(self, *args) -> None:
         pass
 
     def do_GET(self) -> None:
@@ -80,10 +77,9 @@ class _MJPEGHandler(BaseHTTPRequestHandler):
                     self.wfile.flush()
                 except _queue.Empty:
                     if not active and _stream_state["queue"].empty():
-                        break  
+                        break
         except (BrokenPipeError, ConnectionResetError):
-            pass  
-
+            pass
 
 def _start_mjpeg_server() -> None:
     server = HTTPServer(("127.0.0.1", MJPEG_PORT), _MJPEGHandler)
@@ -123,7 +119,6 @@ _EXERCISE_CONNECTIONS: dict[str, list[tuple[int, int]]] = {
     "Bench Press": [(11, 12), (11, 13), (12, 14), (13, 15), (14, 16)],
 }
 
-
 def _draw_exercise_landmarks(
     frame_bgr: np.ndarray,
     landmarks,
@@ -145,7 +140,6 @@ def _draw_exercise_landmarks(
             cv2.circle(frame_bgr, (cx, cy), 6, (0, 200, 255), -1)
             cv2.circle(frame_bgr, (cx, cy), 6, (255, 140, 0),  2)
 
-
 def _draw_arc(
     frame_bgr: np.ndarray,
     vertex: tuple[int, int],
@@ -164,7 +158,6 @@ def _draw_arc(
     cv2.ellipse(frame_bgr, vertex, (radius, radius), 0,
                 int(start), int(end), color, 2)
 
-
 def _draw_angle_markers(
     frame_bgr: np.ndarray,
     kp: dict,
@@ -176,7 +169,6 @@ def _draw_angle_markers(
         return
     h, w = frame_bgr.shape[:2]
 
-    # Elbow angle arcs
     configs = [
         ("left_shoulder",  "left_elbow",  "left_wrist",  "left_elbow",  (0, 255, 255)),
         ("right_shoulder", "right_elbow", "right_wrist", "right_elbow", (0, 200, 255)),
@@ -191,7 +183,6 @@ def _draw_angle_markers(
                     (vx[0] + 10, vx[1] - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
-    # Back angle: shoulder-hip midpoint line vs horizontal
     sx = int((kp["left_shoulder"][0] + kp["right_shoulder"][0]) / 2 * w)
     sy = int((kp["left_shoulder"][1] + kp["right_shoulder"][1]) / 2 * h)
     hx = int((kp["left_hip"][0]      + kp["right_hip"][0])      / 2 * w)
@@ -207,12 +198,10 @@ def _draw_angle_markers(
                 (mid_x + 6, mid_y - 6),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, color_back, 2)
 
-
 def _clean(line: str) -> str:
     return (line.replace("✅", "").replace("⚠️", "").replace("⚠", "")
                 .replace("\u2014", "-").replace("\u2013", "-")
                 .strip())
-
 
 _FONT_PATHS = [
     "C:/Windows/Fonts/calibrib.ttf",
@@ -222,13 +211,11 @@ _FONT_PATHS = [
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
 ]
 
-
 def _pil_font(size: int) -> ImageFont.FreeTypeFont:
     for p in _FONT_PATHS:
         if Path(p).exists():
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
-
 
 def _truncate_pil(text: str, font, max_w: int, draw) -> str:
     try:
@@ -247,7 +234,6 @@ def _truncate_pil(text: str, font, max_w: int, draw) -> str:
         if tw <= max_w:
             return s
     return "..."
-
 
 def _draw_feedback_overlay(frame_bgr: np.ndarray, lines: list[str]) -> None:
     if not lines:
@@ -277,12 +263,10 @@ def _draw_feedback_overlay(frame_bgr: np.ndarray, lines: list[str]) -> None:
         draw.text((x1 + pad, y1 + pad + line_h * i), text, font=pil_font, fill=color)
     frame_bgr[:] = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
-
 def _build_overlay_cache(frame_shape: tuple, lines: list[str]) -> np.ndarray:
     canvas = np.zeros(frame_shape, dtype=np.uint8)
     _draw_feedback_overlay(canvas, lines)
     return canvas
-
 
 def _blit_overlay(dst: np.ndarray, overlay: np.ndarray) -> None:
     mask = np.any(overlay != 0, axis=2)
@@ -304,10 +288,9 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 480
     OVERLAY_DURATION = int(fps * 3)
 
-    # Gradio gr.Image streams via WebSocket — cap at 12fps to avoid lag
     DISPLAY_FPS    = 12.0
     FRAME_INTERVAL = 1.0 / DISPLAY_FPS
-    # Read every Nth frame to keep pace with display rate
+
     SKIP_FRAMES    = max(1, round(fps / DISPLAY_FPS))
     frame_idx      = 0
 
@@ -375,7 +358,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     overlay_frames_left:  int = 0
     prev_counter:         int = 0
     last_frame_rgb: Optional[np.ndarray] = None
-    DISPLAY_MAX = 480   # smaller = less WebSocket payload = less lag
+    DISPLAY_MAX = 480
     next_yield_time = time.monotonic()
 
     while cap.isOpened():
@@ -398,7 +381,6 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         except _queue.Full:
             pass
 
-        # Skip frames — only render and yield every Nth frame
         if frame_idx % SKIP_FRAMES != 0:
             continue
 
@@ -472,11 +454,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     yield last_frame_rgb, summary
 
 def process_video_file(video_path: Optional[str], exercise: str):
-    """
-    Process entire video, write annotated frames to a temp mp4 file,
-    yield (None, feedback_text) during processing for real-time text updates,
-    then yield (output_path, summary) at the end for smooth native video playback.
-    """
+    
     if video_path is None:
         return
 
@@ -496,7 +474,6 @@ def process_video_file(video_path: Optional[str], exercise: str):
     INFER_MAX_DIM    = 640 if _GPU_AVAILABLE else 480
     OVERLAY_DURATION = int(fps * 3)
 
-    # Temp output file
     tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     out_path = tmp.name
     tmp.close()
@@ -518,7 +495,6 @@ def process_video_file(video_path: Optional[str], exercise: str):
     feedback         = "Đang xử lý..."
     frame_idx        = 0
 
-    # Parallel barbell detection
     _pool = ThreadPoolExecutor(max_workers=1)
 
     yield None, "Đang xử lý video..."
@@ -530,13 +506,11 @@ def process_video_file(video_path: Optional[str], exercise: str):
 
         frame_idx += 1
 
-        # Resize for inference
         h, w  = frame_bgr.shape[:2]
         scale = min(1.0, INFER_MAX_DIM / max(h, w))
         infer_bgr = cv2.resize(frame_bgr, (int(w * scale), int(h * scale))) if scale < 1.0 else frame_bgr
         infer_rgb = cv2.cvtColor(infer_bgr, cv2.COLOR_BGR2RGB)
 
-        # Pose + barbell in parallel
         barbell_fut = _pool.submit(barbell_tracker.detect, infer_rgb) if barbell_tracker.enabled else None
         results     = pose_detector.process(infer_rgb)
         detection   = barbell_fut.result() if barbell_fut else None
@@ -561,7 +535,6 @@ def process_video_file(video_path: Optional[str], exercise: str):
                     f"Rep {counter} - {sc}/100:\n{feedback}"
                 )
 
-        # Draw annotations on full-res frame
         annotated = frame_bgr.copy()
 
         if counter > prev_counter:
@@ -586,7 +559,6 @@ def process_video_file(video_path: Optional[str], exercise: str):
 
         writer.write(annotated)
 
-        # Yield text feedback every 30 frames so UI stays responsive
         if frame_idx % 30 == 0:
             progress = int(frame_idx / total * 100)
             yield None, f"Đang xử lý... {progress}%\n\n{feedback}"
@@ -602,7 +574,6 @@ def process_video_file(video_path: Optional[str], exercise: str):
         + "\n---\n".join(rep_feedbacks)
     )
     yield out_path, summary
-
 
 def process_video_streaming(video_path: Optional[str], exercise: str):
     if video_path is None:
@@ -637,7 +608,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     _pool = ThreadPoolExecutor(max_workers=1)
 
     _stream_state["active"].set()
-    # Use relative URL /stream so it works on any host (localhost, RunPod, etc.)
+
     _HTML = (
         f'<div style="display:flex;justify-content:center;align-items:flex-start;">'
         f'<img src="/stream?t={token}" '
@@ -656,8 +627,8 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     feedback:            str = ""
     rep_scores:          list = []
     rep_feedbacks:       list = []
-    live_issue_frames:   dict = {}          # issue_text → frames remaining
-    ISSUE_STICKY = max(15, int(fps * 1.5))  # show live issues for 1.5s
+    live_issue_frames:   dict = {}
+    ISSUE_STICKY = max(15, int(fps * 1.5))
     frame_interval  = 1.0 / fps
     next_frame_time = time.monotonic()
 
@@ -698,11 +669,10 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
                     f"Rep {counter} - {sc}/100:\n{feedback}"
                 )
             else:
-                # Refresh sticky live issues from current frame
+
                 for issue in issues:
                     live_issue_frames[issue] = ISSUE_STICKY
 
-        # Decrement all live issue counters every frame
         live_issue_frames = {k: v - 1 for k, v in live_issue_frames.items() if v > 1}
 
         detection = barbell_fut.result() if barbell_fut else None
@@ -716,7 +686,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
             ] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
-            live_issue_frames.clear()  # rep summary takes over display
+            live_issue_frames.clear()
 
         if landmarks:
             _draw_exercise_landmarks(annotated, landmarks, exercise)
@@ -754,6 +724,15 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     _stream_state["active"].clear()
     _pool.shutdown(wait=False)
     cap.release()
+
+    final_done, final_issues = checker.finalize()
+    if final_done:
+        counter   += 1
+        sc         = compute_score(final_issues, checker.rep_metrics, exercise)
+        rep_scores.append(sc)
+        rep_feedbacks.append(
+            f"Rep {counter} - {sc}/100:\nScore: {sc}/100\n" + "\n".join(final_issues)
+        )
 
     avg     = int(sum(rep_scores) / len(rep_scores)) if rep_scores else 0
     summary = (

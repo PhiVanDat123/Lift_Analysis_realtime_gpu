@@ -1,30 +1,13 @@
-"""
-Download and trim a YouTube video for testing.
 
-Usage
------
-    pip install yt-dlp
-    python download_test_video.py --url "YOUTUBE_URL"
-    python download_test_video.py --url "YOUTUBE_URL" --start 10 --duration 50 --out test_squat.mp4
-
-Arguments
----------
-    --url       YouTube video URL (required)
-    --start     Start time in seconds (default: 0)
-    --duration  Clip duration in seconds (default: 50)
-    --out       Output filename (default: test_video.mp4)
-"""
 import argparse
 import subprocess
 import sys
-
 
 def seconds_to_hms(s: int) -> str:
     h  = s // 3600
     m  = (s % 3600) // 60
     sec = s % 60
     return f"{h:02d}:{m:02d}:{sec:02d}"
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -58,7 +41,6 @@ def main() -> None:
 
     print(f"\nDone! Saved to: {args.out}")
     print("Upload this file to the 'Upload Video' tab in the app.")
-
 
 if __name__ == "__main__":
     main()

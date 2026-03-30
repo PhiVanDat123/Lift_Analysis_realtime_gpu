@@ -1,10 +1,4 @@
-"""
-Gradio UI entry point.
-All business logic lives in core/.
 
-FastAPI app is created first, /stream route added, then Gradio mounted —
-so MJPEG stream works on the same port as Gradio on any host (RunPod, etc.).
-"""
 import queue
 
 import gradio as gr
@@ -13,15 +7,11 @@ from fastapi.responses import StreamingResponse
 
 from core.processor import process_video_streaming, _stream_state
 
-
-# ── FastAPI app with MJPEG route ──────────────────────────────────────────────
-
 app = FastAPI()
-
 
 def _mjpeg_generator():
     import time
-    # Wait up to 30s for processing to start (handles race between img load & button click)
+
     deadline = time.time() + 30
     while not _stream_state["active"].is_set():
         if time.time() > deadline:
@@ -42,7 +32,6 @@ def _mjpeg_generator():
             if not active and _stream_state["queue"].empty():
                 break
 
-
 @app.get("/stream")
 def stream():
     return StreamingResponse(
@@ -51,12 +40,9 @@ def stream():
         headers={
             "Cache-Control": "no-cache",
             "Access-Control-Allow-Origin": "*",
-            "X-Accel-Buffering": "no",   # tell nginx/RunPod proxy not to buffer
+            "X-Accel-Buffering": "no",
         },
     )
-
-
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
     gr.Markdown("# AI Exercise Pose Feedback")
@@ -88,9 +74,6 @@ with gr.Blocks(title="AI Exercise Pose Feedback") as demo:
         inputs=[video_input, exercise_radio],
         outputs=[video_display, video_feedback],
     )
-
-
-# ── Mount Gradio onto FastAPI, then run ───────────────────────────────────────
 
 app = gr.mount_gradio_app(app, demo, path="/")
 
