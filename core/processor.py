@@ -690,6 +690,9 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
             prev_counter        = counter
             live_issue_frames.clear()
 
+        if stage == "down" and overlay_frames_left > 0:
+            overlay_frames_left = 0
+
         if landmarks:
             _draw_exercise_landmarks(annotated, landmarks, exercise)
         if kp and angles_snap:
