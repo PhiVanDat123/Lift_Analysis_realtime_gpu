@@ -12,7 +12,6 @@ class SquatChecker(BaseExercise):
     MIN_BAR_VERTICAL       = 0.03
     TORSO_STD_THRESHOLD    = 8
     BAR_DRIFT_THRESHOLD    = 0.05
-    KNEE_COLLAPSE_RATIO    = 0.85
     LR_IMBALANCE_THRESHOLD = 15
 
     def __init__(self, **kwargs):
@@ -65,13 +64,6 @@ class SquatChecker(BaseExercise):
 
         if new_stage == "down":
             self._min_knee = min(self._min_knee, avg_knee)
-
-        knee_w = abs(kp["left_knee"][0] - kp["right_knee"][0])
-        hip_w  = abs(kp["left_hip"][0]  - kp["right_hip"][0])
-        if hip_w > 0.01 and new_stage == "down":
-            ratio = knee_w / hip_w
-            if ratio < self.KNEE_COLLAPSE_RATIO:
-                issues.append("Knees collapsing inward")
 
         lr_diff = abs(angles["left_knee"] - angles["right_knee"])
         if lr_diff > self.LR_IMBALANCE_THRESHOLD and new_stage == "down":

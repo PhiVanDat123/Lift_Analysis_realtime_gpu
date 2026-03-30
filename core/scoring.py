@@ -111,7 +111,6 @@ _ISSUE_PENALTIES: dict[str, int] = {
     "incomplete lockout":       10,
     "inconsistent touch point": 10,
     "bar drifting":             15,
-    "knees collapsing":         20,
     "excessive forward lean":   15,
     "left/right imbalance":     10,
     "inconsistent torso":       10,
