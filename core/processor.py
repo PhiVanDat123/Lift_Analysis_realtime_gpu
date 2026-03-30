@@ -656,6 +656,8 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     feedback:            str = ""
     rep_scores:          list = []
     rep_feedbacks:       list = []
+    live_issue_frames:   dict = {}          # issue_text → frames remaining
+    ISSUE_STICKY = max(15, int(fps * 1.5))  # show live issues for 1.5s
     frame_interval  = 1.0 / fps
     next_frame_time = time.monotonic()
 
@@ -695,6 +697,13 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
                 rep_feedbacks.append(
                     f"Rep {counter} - {sc}/100 ({score_label(sc)}):\n{feedback}"
                 )
+            else:
+                # Refresh sticky live issues from current frame
+                for issue in issues:
+                    live_issue_frames[issue] = ISSUE_STICKY
+
+        # Decrement all live issue counters every frame
+        live_issue_frames = {k: v - 1 for k, v in live_issue_frames.items() if v > 1}
 
         detection = barbell_fut.result() if barbell_fut else None
 
@@ -707,6 +716,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
             ] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
+            live_issue_frames.clear()  # rep summary takes over display
 
         if landmarks:
             _draw_exercise_landmarks(annotated, landmarks, exercise)
@@ -715,10 +725,13 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        stage_line  = f"Stage: {stage or '-'}  |  Rep {counter}"
+        live_lines  = list(live_issue_frames.keys())
         if overlay_frames_left > 0 and rep_overlay_lines:
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
+        elif live_lines:
+            _draw_feedback_overlay(annotated, [stage_line] + live_lines)
         else:
             _draw_feedback_overlay(annotated, [stage_line])
 

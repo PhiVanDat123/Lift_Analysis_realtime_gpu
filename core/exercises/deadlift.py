@@ -19,8 +19,9 @@ class DeadliftChecker(BaseExercise):
     MIN_BAR_VERTICAL = 0.15
 
     # Rule thresholds
-    LOCKOUT_HIP_MIN     = 170   # degrees — full hip extension at lockout
-    LOCKOUT_KNEE_MIN    = 170   # degrees — full knee extension at lockout
+    LOCKOUT_HIP_MIN     = 165   # degrees — full hip extension at lockout
+    LOCKOUT_KNEE_MIN    = 165   # degrees — full knee extension at lockout
+    LOCKOUT_TORSO_MAX   = 0.06  # normalised X — |shoulder_x - hip_x| ≤ this = upright
     LOCKOUT_HOLD_FRAMES = 3     # minimum consecutive frames near bar peak to confirm hold
     LOCKOUT_PEAK_TOL    = 0.02  # normalised Y — bar within this of peak = "at top"
     BAR_SHIN_DIST_MAX   = 0.08  # normalised — Euclidean dist from bar to shin segment
@@ -36,12 +37,14 @@ class DeadliftChecker(BaseExercise):
         self._early_phase_shoulder_y: float | None = None
         self._in_early_phase:         bool = False
         self._early_hip_flagged:      bool = False
-        # lockout + stability tracking — buffer of (bar_cx, bar_cy, avg_hip, avg_knee)
+        # lockout + stability tracking
+        # buffer of (bar_cx, bar_cy, avg_hip, avg_knee, avg_shoulder_x, avg_hip_x)
         # bar_cx/bar_cy = 0.0 when barbell not detected that frame
-        self._up_buffer: deque[tuple[float, float, float, float]] = deque(maxlen=120)
+        self._up_buffer: deque[tuple[float, float, float, float, float, float]] = deque(maxlen=120)
         # severity tracking — reset each rep
         self._lockout_hip:        float = 0.0
         self._lockout_knee:       float = 0.0
+        self._lockout_torso_ok:   bool  = False
         self._lockout_hold_ok:    bool  = False
         self._max_bar_shin_dist:  float = 0.0
         self._max_hip_rise_delta: float = 0.0
@@ -55,6 +58,7 @@ class DeadliftChecker(BaseExercise):
         self._up_buffer.clear()
         self._lockout_hip            = 0.0
         self._lockout_knee           = 0.0
+        self._lockout_torso_ok       = False
         self._lockout_hold_ok        = False
         self._max_bar_shin_dist      = 0.0
         self._max_hip_rise_delta     = 0.0
@@ -77,34 +81,41 @@ class DeadliftChecker(BaseExercise):
         t = max(0.0, min(1.0, t))
         return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
 
-    def _eval_lockout_from_buffer(self) -> tuple[float, float, bool]:
+    def _eval_lockout_from_buffer(self) -> tuple[float, float, bool, bool]:
         """
         Analyse _up_buffer to find the frame where bar is at its peak (min cy),
-        read hip/knee angles there, and count how many consecutive frames near
-        peak satisfy the lockout angle requirements.
+        then check three lockout conditions at that frame:
+          (1) knee_angle > LOCKOUT_KNEE_MIN  — knee fully extended
+          (2) hip_angle  > LOCKOUT_HIP_MIN   — hip fully extended
+          (3) |shoulder_x - hip_x| < LOCKOUT_TORSO_MAX — torso upright
 
-        Returns (hip_at_peak, knee_at_peak, hold_ok).
+        Also counts consecutive frames near peak where ALL three conditions hold.
+
+        Returns (hip_at_peak, knee_at_peak, torso_ok, hold_ok).
         Falls back to best angles seen if barbell data is missing.
         """
         if not self._up_buffer:
-            return 0.0, 0.0, False
+            return 0.0, 0.0, False, False
 
         buf = list(self._up_buffer)
 
         # Find peak bar position (min cy = highest on screen)
         # bar_cy = 0.0 means no detection that frame — skip
-        valid = [(cx, cy, h, k) for cx, cy, h, k in buf if cy > 0.0]
+        valid = [(cx, cy, h, k, sx, hx) for cx, cy, h, k, sx, hx in buf if cy > 0.0]
 
         if valid:
-            peak_cy = min(v[1] for v in valid)
+            peak_cy    = min(v[1] for v in valid)
             peak_frame = min(valid, key=lambda v: v[1])
             hip_at_peak, knee_at_peak = peak_frame[2], peak_frame[3]
+            sx_peak, hx_peak = peak_frame[4], peak_frame[5]
+            torso_ok = abs(sx_peak - hx_peak) <= self.LOCKOUT_TORSO_MAX
 
-            # Count consecutive frames within LOCKOUT_PEAK_TOL of peak
-            # where both angles meet lockout thresholds
+            # Count consecutive frames near peak where ALL three conditions hold
             near_peak = [
-                (h >= self.LOCKOUT_HIP_MIN and k >= self.LOCKOUT_KNEE_MIN)
-                for cx, cy, h, k in valid
+                (h >= self.LOCKOUT_HIP_MIN
+                 and k >= self.LOCKOUT_KNEE_MIN
+                 and abs(sx - hx) <= self.LOCKOUT_TORSO_MAX)
+                for cx, cy, h, k, sx, hx in valid
                 if cy <= peak_cy + self.LOCKOUT_PEAK_TOL
             ]
             max_hold = best = 0
@@ -115,11 +126,12 @@ class DeadliftChecker(BaseExercise):
             hold_ok = max_hold >= self.LOCKOUT_HOLD_FRAMES
         else:
             # No barbell data — fall back to best angles in buffer
-            hip_at_peak  = max(h for _, _, h, _ in buf)
-            knee_at_peak = max(k for _, _, _, k in buf)
-            hold_ok = False
+            hip_at_peak  = max(h for _, _, h, _, _, _ in buf)
+            knee_at_peak = max(k for _, _, _, k, _, _ in buf)
+            torso_ok     = False
+            hold_ok      = False
 
-        return hip_at_peak, knee_at_peak, hold_ok
+        return hip_at_peak, knee_at_peak, torso_ok, hold_ok
 
     def _eval_bar_stability(self) -> list[str]:
         """
@@ -281,16 +293,18 @@ class DeadliftChecker(BaseExercise):
                 self._early_hip_flagged = True
 
         # 4. Lockout + stability — accumulate buffer during "up" phase
-        #    Each frame: (bar_cx, bar_cy, avg_hip, avg_knee)
+        #    Each frame: (bar_cx, bar_cy, avg_hip, avg_knee, avg_shoulder_x, avg_hip_x)
         #    bar_cx/bar_cy = 0.0 sentinel when barbell tracker unavailable
         if new_stage == "up":
-            avg_knee = (angles["left_knee"] + angles["right_knee"]) / 2
+            avg_knee      = (angles["left_knee"]      + angles["right_knee"])      / 2
+            avg_shoulder_x = (kp["left_shoulder"][0]  + kp["right_shoulder"][0])   / 2
+            avg_hip_x      = (kp["left_hip"][0]       + kp["right_hip"][0])        / 2
             bar_cx = bar_cy = 0.0
             if self.barbell_tracker and self.barbell_tracker.enabled:
                 if self.barbell_tracker._last_raw is not None:
                     bar_cx = self.barbell_tracker._last_raw[0]
                     bar_cy = self.barbell_tracker._last_raw[1]
-            self._up_buffer.append((bar_cx, bar_cy, avg_hip, avg_knee))
+            self._up_buffer.append((bar_cx, bar_cy, avg_hip, avg_knee, avg_shoulder_x, avg_hip_x))
 
         # Clear buffer when dropping back to "down" (failed rep / lowering)
         if new_stage == "down" and stage == "up":
@@ -299,15 +313,20 @@ class DeadliftChecker(BaseExercise):
         # ── Per-rep checks (on completion) ────────────────────────────────────
         if rep_completed:
 
-            # Evaluate lockout at bar peak
-            hip_at_peak, knee_at_peak, hold_ok = self._eval_lockout_from_buffer()
-            self._lockout_hip   = hip_at_peak
-            self._lockout_knee  = knee_at_peak
-            self._lockout_hold_ok = hold_ok
+            # Evaluate lockout at bar peak — 3 conditions
+            hip_at_peak, knee_at_peak, torso_ok, hold_ok = self._eval_lockout_from_buffer()
+            self._lockout_hip      = hip_at_peak
+            self._lockout_knee     = knee_at_peak
+            self._lockout_torso_ok = torso_ok
+            self._lockout_hold_ok  = hold_ok
 
-            if hip_at_peak < self.LOCKOUT_HIP_MIN or knee_at_peak < self.LOCKOUT_KNEE_MIN:
-                issues.append("Incomplete lockout")
-            elif not hold_ok:
+            if knee_at_peak < self.LOCKOUT_KNEE_MIN:
+                issues.append("Incomplete lockout — knees not fully extended")
+            if hip_at_peak < self.LOCKOUT_HIP_MIN:
+                issues.append("Incomplete lockout — hips not fully extended")
+            if not torso_ok:
+                issues.append("Torso not upright at lockout")
+            if knee_at_peak >= self.LOCKOUT_KNEE_MIN and hip_at_peak >= self.LOCKOUT_HIP_MIN and torso_ok and not hold_ok:
                 issues.append("Lockout not held")
 
             # Bar path stability — drift and wobble from buffer
@@ -322,13 +341,13 @@ class DeadliftChecker(BaseExercise):
             self.rep_metrics = {
                 "lockout_hip":      self._lockout_hip,
                 "lockout_knee":     self._lockout_knee,
+                "lockout_torso_ok": self._lockout_torso_ok,
                 "lockout_hold_ok":  self._lockout_hold_ok,
                 "max_bar_shin":     self._max_bar_shin_dist,
                 "hip_rise_delta":   self._max_hip_rise_delta,
                 "bar_drift":        bar_drift,
                 "bar_wobble":       bar_wobble,
             }
-
 
             # Reset per-rep state
             self._early_phase_hip_y      = None
@@ -338,10 +357,10 @@ class DeadliftChecker(BaseExercise):
             self._up_buffer.clear()
             self._lockout_hip            = 0.0
             self._lockout_knee           = 0.0
+            self._lockout_torso_ok       = False
             self._lockout_hold_ok        = False
             self._max_bar_shin_dist      = 0.0
             self._max_hip_rise_delta     = 0.0
-            self._up_buffer.clear()
 
             if len(issues) == 1:  # only the score line → perfect rep
                 issues.insert(0, "Good rep!")
