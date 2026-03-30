@@ -94,7 +94,8 @@ class BenchPressChecker(BaseExercise):
         if new_stage == "up" and stage == "down":
             self._in_push = True
 
-        rep_completed = self._in_push and bar_dir == "down" and new_stage == "down"
+        # Rep fires as soon as bar starts descending after push = bar just passed peak
+        rep_completed = self._in_push and bar_dir == "down"
 
         if rep_completed and bt and bt.enabled:
             v_range = bt.vertical_range()
