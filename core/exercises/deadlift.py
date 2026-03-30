@@ -146,7 +146,7 @@ class DeadliftChecker(BaseExercise):
         Returns list of issue strings (empty = no instability).
         """
         buf = list(self._up_buffer)
-        xs = [cx for cx, cy, _, _ in buf if cy > 0.0]   # only detected frames
+        xs = [cx for cx, cy, _, _, _, _ in buf if cy > 0.0]   # only detected frames
 
         if len(xs) < 5:
             return []   # not enough data
