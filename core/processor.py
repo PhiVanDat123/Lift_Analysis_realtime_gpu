@@ -411,11 +411,12 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
         if overlay_frames_left > 0 and rep_overlay_lines:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
         else:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
             _draw_feedback_overlay(annotated, [stage_line])
 
         dh, dw = annotated.shape[:2]
@@ -550,11 +551,12 @@ def process_video_file(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
         if overlay_frames_left > 0 and rep_overlay_lines:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
         else:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
             _draw_feedback_overlay(annotated, [stage_line])
 
         writer.write(annotated)
@@ -695,14 +697,16 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line  = f"Stage: {stage or '-'}  |  Rep {counter}"
         live_lines  = list(live_issue_frames.keys())
         if overlay_frames_left > 0 and rep_overlay_lines:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
         elif live_lines:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
             _draw_feedback_overlay(annotated, [stage_line] + live_lines)
         else:
+            stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
             _draw_feedback_overlay(annotated, [stage_line])
 
         _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
