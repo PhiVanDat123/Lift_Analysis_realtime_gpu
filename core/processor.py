@@ -429,7 +429,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
         if overlay_frames_left > 0 and rep_overlay_lines:
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
@@ -577,7 +577,7 @@ def process_video_file(video_path: Optional[str], exercise: str):
         if barbell_tracker.enabled:
             barbell_tracker.draw(annotated, detection)
 
-        stage_line = f"Stage: {stage or '-'}  |  Rep {counter}"
+        stage_line = f"Stage: {stage or '-'}  |  Rep {counter + 1}"
         if overlay_frames_left > 0 and rep_overlay_lines:
             _draw_feedback_overlay(annotated, [stage_line] + rep_overlay_lines)
             overlay_frames_left -= 1
