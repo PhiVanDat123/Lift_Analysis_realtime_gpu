@@ -35,6 +35,7 @@ class BenchPressChecker(BaseExercise):
         self._face_direction:   float = 0.0
         self._bottom_y:         list[float] = []   # bar_cy at chest per rep
         self._rep_min_bar_y:    float = 1.0
+        self._in_push:          bool  = False      # True once stage goes down→up, until peak fires
         # buffer during "up" phase: (bar_cx, bar_cy, avg_elbow, left_elbow, right_elbow)
         self._up_buffer: deque[tuple[float, float, float, float, float]] = deque(maxlen=120)
 
@@ -49,6 +50,7 @@ class BenchPressChecker(BaseExercise):
         self._face_direction   = 0.0
         self._bottom_y.clear()
         self._rep_min_bar_y    = 1.0
+        self._in_push          = False
         self._up_buffer.clear()
 
     def _eval_peak_from_buffer(self) -> tuple[float, float, float]:
@@ -85,9 +87,14 @@ class BenchPressChecker(BaseExercise):
             elif avg_elbow >= self.ELBOW_UP:
                 new_stage = "up"
 
-        # ── Rep detection: completed when bar starts descending after "up" ────
-        # i.e. stage was "up" and bar_dir just switched to "down"
-        rep_completed = (stage == "up" and new_stage == "down")
+        # ── Rep detection ─────────────────────────────────────────────────────
+        # Stage: down→up same as old logic
+        # _in_push becomes True when stage first enters "up"
+        # rep_completed fires when bar peaks = bar_dir switches to "down" while _in_push
+        if new_stage == "up" and stage == "down":
+            self._in_push = True
+
+        rep_completed = self._in_push and bar_dir == "down" and new_stage == "down"
 
         if rep_completed and bt and bt.enabled:
             v_range = bt.vertical_range()
@@ -147,9 +154,6 @@ class BenchPressChecker(BaseExercise):
             self._up_buffer.append((bar_cx, bar_cy, avg_elbow,
                                     angles["left_elbow"], angles["right_elbow"]))
 
-        # Clear buffer when going back down before rep completes (failed push)
-        if new_stage == "down" and stage == "up" and not rep_completed:
-            self._up_buffer.clear()
 
         # ── Per-rep checks (at bar peak) ──────────────────────────────────────
         if rep_completed:
@@ -213,6 +217,7 @@ class BenchPressChecker(BaseExercise):
             self._worst_flare      = 0.0
             self._worst_back_angle = 0.0
             self._worst_wrist_bend = 0.0
+            self._in_push          = False
             self._up_buffer.clear()
 
         return new_stage, rep_completed, issues
