@@ -24,7 +24,7 @@ _yolo_model = None
 def _load_rf_model():
     global _rf_model
     if _rf_model is None:
-        from inference import get_model  
+        from inference import get_model
         _rf_model = get_model(
             model_id=MODEL_ID,
             api_key=os.environ["ROBOFLOW_API_KEY"],

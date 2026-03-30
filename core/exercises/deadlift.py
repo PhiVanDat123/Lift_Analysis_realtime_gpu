@@ -329,9 +329,6 @@ class DeadliftChecker(BaseExercise):
                 "bar_wobble":       bar_wobble,
             }
 
-            form_score = self.compute_form_score()
-            self.rep_metrics["form_score"] = form_score
-            issues.append(f"Form score: {form_score}/100")
 
             # Reset per-rep state
             self._early_phase_hip_y      = None

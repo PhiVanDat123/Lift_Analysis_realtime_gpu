@@ -38,33 +38,33 @@ def _squat_score(m: dict) -> int:
 
 
 def _deadlift_score(m: dict) -> int:
-    back = _pts(
-        m.get("min_shoulder", 45),
-        [15,  25,  35,  45,  60],
-        [ 0,   8,  18,  28,  35],
-    )
+    # Lockout hip (25 pts) — 172°+ = full, 140°- = 0
     l_hip = _pts(
         m.get("lockout_hip", 170),
         [140, 155, 162, 167, 172],
-        [  0,   3,   7,  11,  13],
+        [  0,   5,  12,  19,  25],
     )
+    # Lockout knee (25 pts) — 168°+ = full, 140°- = 0
     l_knee = _pts(
         m.get("lockout_knee", 165),
         [140, 150, 157, 162, 168],
-        [  0,   2,   6,   9,  12],
+        [  0,   5,  12,  19,  25],
     )
+    # Early hip rise (25 pts)
     timing = _pts(
         m.get("hip_rise_delta", 0),
         [0.00, 0.03, 0.05, 0.08, 0.15],
-        [20,   15,    8,    3,    0],
+        [25,   20,   12,    4,    0],
     )
+    # Bar proximity to shins (15 pts)
     prox = _pts(
         m.get("max_bar_shin", 0),
         [0.01, 0.04, 0.08, 0.12],
         [15,   10,    4,    0],
     )
-    drift_pts = 0 if m.get("bar_drift", False) else 5
-    return max(0, min(100, round(back + l_hip + l_knee + timing + prox + drift_pts)))
+    # Bar drift (10 pts)
+    drift_pts = 0 if m.get("bar_drift", False) else 10
+    return max(0, min(100, round(l_hip + l_knee + timing + prox + drift_pts)))
 
 
 def _bench_score(m: dict) -> int:
