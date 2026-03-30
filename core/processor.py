@@ -37,7 +37,7 @@ from core.pose import (
     mp_pose,
     pose_detector,
 )
-from core.scoring import compute_score, score_color_bgr, score_label
+from core.scoring import compute_score, score_color_bgr
 
 _stream_state: dict = {
     "queue":  _queue.Queue(maxsize=30),  
@@ -107,7 +107,7 @@ def _draw_hud(
         color = score_color_bgr(last_score)
         cv2.putText(
             frame_bgr,
-            f"Score : {last_score}/100  {score_label(last_score)}",
+            f"Score : {last_score}/100 ",
             (10, 108), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
         )
 
@@ -357,13 +357,13 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
                         sc = compute_score(issues, checker.rep_metrics, exercise)
                         _state["last_score"] = sc
                         fb = (
-                            f"Score: {sc}/100 ({score_label(sc)})\n"
+                            f"Score: {sc}/100\n"
                             + "\n".join(issues)
                         )
                         _state["feedback"] = fb
                         _state["rep_scores"].append(sc)
                         _state["rep_feedbacks"].append(
-                            f"Rep {_state['counter']} - {sc}/100 ({score_label(sc)}):\n{fb}"
+                            f"Rep {_state['counter']} - {sc}/100:\n{fb}"
                         )
 
             infer_q.task_done()
@@ -417,7 +417,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
         if counter > prev_counter:
             issue_lines       = [l for l in feedback.split("\n") if not l.startswith("Score:")]
             rep_overlay_lines = [
-                f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"
+                f"Rep {counter} - {last_score}/100:"
             ] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
@@ -466,7 +466,7 @@ def process_video_realtime(video_path: Optional[str], exercise: str):
     avg     = int(sum(rep_scores) / len(rep_scores)) if rep_scores else 0
     summary = (
         f"Tổng số rep   : {counter}\n"
-        f"Điểm TB       : {avg}/100 ({score_label(avg)})\n\n"
+        f"Điểm TB       : {avg}/100\n\n"
         + "\n---\n".join(rep_feedbacks)
     )
     yield last_frame_rgb, summary
@@ -553,12 +553,12 @@ def process_video_file(video_path: Optional[str], exercise: str):
                 sc         = compute_score(issues, checker.rep_metrics, exercise)
                 last_score = sc
                 feedback   = (
-                    f"Rep {counter} — Score: {sc}/100 ({score_label(sc)})\n"
+                    f"Rep {counter} — Score: {sc}/100\n"
                     + "\n".join(issues)
                 )
                 rep_scores.append(sc)
                 rep_feedbacks.append(
-                    f"Rep {counter} - {sc}/100 ({score_label(sc)}):\n{feedback}"
+                    f"Rep {counter} - {sc}/100:\n{feedback}"
                 )
 
         # Draw annotations on full-res frame
@@ -566,7 +566,7 @@ def process_video_file(video_path: Optional[str], exercise: str):
 
         if counter > prev_counter:
             issue_lines       = [l for l in feedback.split("\n") if not l.startswith("Rep")]
-            rep_overlay_lines = [f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"] + issue_lines
+            rep_overlay_lines = [f"Rep {counter} - {last_score}/100:"] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
 
@@ -598,7 +598,7 @@ def process_video_file(video_path: Optional[str], exercise: str):
     avg     = int(sum(rep_scores) / len(rep_scores)) if rep_scores else 0
     summary = (
         f"Tổng số rep   : {counter}\n"
-        f"Điểm TB       : {avg}/100 ({score_label(avg)})\n\n"
+        f"Điểm TB       : {avg}/100\n\n"
         + "\n---\n".join(rep_feedbacks)
     )
     yield out_path, summary
@@ -690,12 +690,12 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
                 sc          = compute_score(issues, checker.rep_metrics, exercise)
                 last_score  = sc
                 feedback    = (
-                    f"Score: {sc}/100 ({score_label(sc)})\n"
+                    f"Score: {sc}/100\n"
                     + "\n".join(issues)
                 )
                 rep_scores.append(sc)
                 rep_feedbacks.append(
-                    f"Rep {counter} - {sc}/100 ({score_label(sc)}):\n{feedback}"
+                    f"Rep {counter} - {sc}/100:\n{feedback}"
                 )
             else:
                 # Refresh sticky live issues from current frame
@@ -712,7 +712,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
         if counter > prev_counter:
             issue_lines        = [l for l in feedback.split("\n") if not l.startswith("Score:")]
             rep_overlay_lines  = [
-                f"Rep {counter} - {last_score}/100 ({score_label(last_score or 0)}):"
+                f"Rep {counter} - {last_score}/100:"
             ] + issue_lines
             overlay_frames_left = OVERLAY_DURATION
             prev_counter        = counter
@@ -758,7 +758,7 @@ def process_video_streaming(video_path: Optional[str], exercise: str):
     avg     = int(sum(rep_scores) / len(rep_scores)) if rep_scores else 0
     summary = (
         f"Tổng số rep   : {counter}\n"
-        f"Điểm TB       : {avg}/100 ({score_label(avg)})\n\n"
+        f"Điểm TB       : {avg}/100\n\n"
         + "\n---\n".join(rep_feedbacks)
     )
     yield _HTML, summary

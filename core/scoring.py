@@ -152,15 +152,6 @@ def compute_score(
     return _penalty_score(issues)
 
 
-def score_label(score: int) -> str:
-    if score >= 90:
-        return "Excellent"
-    if score >= 75:
-        return "Good"
-    if score >= 55:
-        return "Average"
-    return "Needs Work"
-
 
 def score_color_bgr(score: int) -> tuple[int, int, int]:
     if score >= 90:
